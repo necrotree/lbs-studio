@@ -39,10 +39,49 @@
 #include <util/threading.h>
 #include <util/util.hpp>
 
-#include <QAccessible>
-#include <QSystemTrayIcon>
-
+/* C++ */
+#include <atomic>
+#include <cstdint>
 #include <deque>
+#include <filesystem>
+#include <functional>
+#include <future>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+/* Qt */
+#include <QAccessible>
+#include <QAction>
+#include <QByteArray>
+#include <QColor>
+#include <QDialog>
+#include <QDockWidget>
+#include <QIcon>
+#include <QLabel>
+#include <QList>
+#include <QMenu>
+#include <QModelIndex>
+#include <QObject>
+#include <QPointer>
+#include <QPushButton>
+#include <QScopedPointer>
+#include <QSlider>
+#include <QString>
+#include <QStringList>
+#include <QSystemTrayIcon>
+#include <QThread>
+#include <QTimer>
+#include <QUrl>
+#include <QVariant>
+#include <QVBoxLayout>
+#include <QWidget>
+#include <QWidgetAction>
+#include <QWindow>
 
 extern volatile bool recording_paused;
 

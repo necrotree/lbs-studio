@@ -23,6 +23,7 @@
 #include "formats.h"
 
 #include <util/darray.h>
+#include <util/threading.h>
 
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
@@ -93,11 +94,13 @@ struct _obs_pipewire {
 	struct spa_hook registry_listener;
 
 	GPtrArray *streams;
+	volatile bool destroying;
 };
 
 struct _obs_pipewire_stream {
 	obs_pipewire *obs_pw;
 	obs_source_t *source;
+	volatile bool destroying;
 
 	gs_texture_t *texture;
 
@@ -179,7 +182,6 @@ static void update_pw_versions(obs_pipewire *obs_pw, const char *version)
 static void teardown_pipewire(obs_pipewire *obs_pw)
 {
 	if (obs_pw->thread_loop) {
-		pw_thread_loop_wait(obs_pw->thread_loop);
 		pw_thread_loop_stop(obs_pw->thread_loop);
 	}
 
@@ -554,8 +556,9 @@ static void renegotiate_format(void *data, uint64_t expirations)
 	struct spa_pod_builder pod_builder = SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	uint32_t n_params;
 	if (!build_format_params(obs_pw_stream, &pod_builder, &params, &n_params)) {
-		teardown_pipewire(obs_pw);
 		pw_thread_loop_unlock(obs_pw->thread_loop);
+		bfree(params);
+		blog(LOG_WARNING, "[pipewire] Failed to build renegotiation parameters");
 		return;
 	}
 
@@ -1179,6 +1182,8 @@ void obs_pipewire_destroy(obs_pipewire *obs_pw)
 {
 	if (!obs_pw)
 		return;
+	if (os_atomic_set_bool(&obs_pw->destroying, true))
+		return;
 
 	while (obs_pw->streams->len > 0) {
 		obs_pipewire_stream *obs_pw_stream = g_ptr_array_index(obs_pw->streams, 0);
@@ -1400,26 +1405,43 @@ void obs_pipewire_stream_set_cursor_visible(obs_pipewire_stream *obs_pw_stream, 
 void obs_pipewire_stream_destroy(obs_pipewire_stream *obs_pw_stream)
 {
 	uint32_t output_flags;
+	obs_pipewire *obs_pw;
+	struct pw_thread_loop *thread_loop;
 
 	if (!obs_pw_stream)
 		return;
+	/* Portal cancellation, scene removal and owner shutdown can converge on
+	 * this function.  Only the first path may tear down the stream. */
+	if (os_atomic_set_bool(&obs_pw_stream->destroying, true))
+		return;
+
+	obs_pw = obs_pw_stream->obs_pw;
+	if (!obs_pw)
+		return;
+	thread_loop = obs_pw->thread_loop;
 
 	output_flags = obs_source_get_output_flags(obs_pw_stream->source);
 	if (output_flags & OBS_SOURCE_ASYNC_VIDEO)
 		obs_source_output_video(obs_pw_stream->source, NULL);
 
-	g_ptr_array_remove(obs_pw_stream->obs_pw->streams, obs_pw_stream);
+	if (obs_pw->streams)
+		g_ptr_array_remove(obs_pw->streams, obs_pw_stream);
 
 	obs_enter_graphics();
 	g_clear_pointer(&obs_pw_stream->cursor.texture, gs_texture_destroy);
 	g_clear_pointer(&obs_pw_stream->texture, gs_texture_destroy);
 	obs_leave_graphics();
 
-	pw_thread_loop_lock(obs_pw_stream->obs_pw->thread_loop);
-	if (obs_pw_stream->stream)
-		pw_stream_disconnect(obs_pw_stream->stream);
-	g_clear_pointer(&obs_pw_stream->stream, pw_stream_destroy);
-	pw_thread_loop_unlock(obs_pw_stream->obs_pw->thread_loop);
+	if (thread_loop && !os_atomic_load_bool(&obs_pw->destroying)) {
+		pw_thread_loop_lock(thread_loop);
+		if (obs_pw_stream->stream)
+			pw_stream_disconnect(obs_pw_stream->stream);
+		g_clear_pointer(&obs_pw_stream->stream, pw_stream_destroy);
+		pw_thread_loop_unlock(thread_loop);
+	} else {
+		/* Owner shutdown lets pw_context_destroy() dispose the pw_stream. */
+		obs_pw_stream->stream = NULL;
+	}
 
 	g_clear_fd(&obs_pw_stream->sync.acquire_syncobj_fd, NULL);
 	g_clear_fd(&obs_pw_stream->sync.release_syncobj_fd, NULL);

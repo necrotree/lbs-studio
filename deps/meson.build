@@ -1,0 +1,6 @@
+subdir('blake2')
+subdir('file-updater')
+subdir('glad')
+subdir('libcaption')
+subdir('media-playback')
+subdir('opts-parser')

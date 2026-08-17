@@ -1,6 +1,21 @@
 # Exclude everything
 /*
 
+# Keep the LBS application icon added under the otherwise ignored src tree.
+!/src/
+/src/*
+!/src/data/
+/src/data/*
+!/src/data/icons/
+/src/data/icons/*
+!/src/data/icons/hicolor/
+/src/data/icons/hicolor/*
+!/src/data/icons/hicolor/512x512/
+/src/data/icons/hicolor/512x512/*
+!/src/data/icons/hicolor/512x512/apps/
+/src/data/icons/hicolor/512x512/apps/*
+!/src/data/icons/hicolor/512x512/apps/com.necrotree.LBS.png
+
 # Except for default project files
 !/.github
 !/build-aux

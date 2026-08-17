@@ -712,10 +712,12 @@ void obs_source_destroy(struct obs_source *source)
 		return;
 
 	if (os_atomic_set_long(&source->destroying, true) == true) {
-		blog(LOG_ERROR, "Double destroy just occurred. "
+		blog(LOG_ERROR, "Double destroy just occurred for source '%s' (%s). "
 				"Something called addref on a source "
 				"after it was already fully released, "
-				"I guess.");
+				"I guess.",
+		     source->context.name ? source->context.name : "unknown",
+		     source->info.id ? source->info.id : "unknown");
 		return;
 	}
 

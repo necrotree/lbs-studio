@@ -101,7 +101,7 @@ find_path(
   MbedTLS_INCLUDE_DIR
   NAMES mbedtls/ssl.h
   HINTS "${PC_MbedTLS_INCLUDE_DIRS}"
-  PATHS /usr/include /usr/local/include
+  PATHS /usr/include /usr/include/mbedtls3 /usr/local/include
   DOC "MbedTLS include directory"
 )
 
@@ -151,7 +151,7 @@ find_library(
   Mbedtls_LIBRARY
   NAMES libmbedtls mbedtls
   HINTS "${PC_MbedTLS_LIBRARY_DIRS}"
-  PATHS /usr/lib /usr/local/lib
+  PATHS /usr/lib /usr/lib/mbedtls3 /usr/local/lib
   DOC "MbedTLS location"
 )
 
@@ -159,7 +159,7 @@ find_library(
   Mbedcrypto_LIBRARY
   NAMES libmbedcrypto mbedcrypto
   HINTS "${PC_MbedTLS_LIBRARY_DIRS}"
-  PATHS /usr/lib /usr/local/lib
+  PATHS /usr/lib /usr/lib/mbedtls3 /usr/local/lib
   DOC "MbedCrypto location"
 )
 
@@ -167,7 +167,7 @@ find_library(
   Mbedx509_LIBRARY
   NAMES libmbedx509 mbedx509
   HINTS "${PC_MbedTLS_LIBRARY_DIRS}"
-  PATHS /usr/lib /usr/local/lib
+  PATHS /usr/lib /usr/lib/mbedtls3 /usr/local/lib
   DOC "MbedX509 location"
 )
 

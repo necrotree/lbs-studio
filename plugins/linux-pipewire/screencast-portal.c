@@ -477,9 +477,22 @@ static bool reload_session_cb(obs_properties_t *properties, obs_property_t *prop
 
 	struct screencast_portal_capture *capture = data;
 
+	/* Stop every callback belonging to the old portal request before its
+	 * PipeWire connection and thread loop are destroyed. */
+	if (capture->cancellable)
+		g_cancellable_cancel(capture->cancellable);
+	g_clear_object(&capture->cancellable);
 	g_clear_pointer(&capture->restore_token, bfree);
-	g_clear_pointer(&capture->obs_pw_stream, obs_pipewire_stream_destroy);
-	g_clear_pointer(&capture->obs_pw, obs_pipewire_destroy);
+	/* obs_pipewire owns every stream in its streams array.  Destroying the
+	 * stream separately and then its owner creates two competing teardown
+	 * paths when portal callbacks overlap scene changes. */
+	if (capture->obs_pw) {
+		g_clear_pointer(&capture->obs_pw, obs_pipewire_destroy);
+		capture->obs_pw_stream = NULL;
+	} else {
+		g_clear_pointer(&capture->obs_pw_stream,
+				obs_pipewire_stream_destroy);
+	}
 
 	if (capture->session_handle) {
 		blog(LOG_DEBUG, "[pipewire] Cleaning previous session %s", capture->session_handle);
@@ -560,6 +573,11 @@ static void screencast_portal_capture_destroy(void *data)
 	if (!capture)
 		return;
 
+	/* Async portal callbacks carry capture as user data.  Cancel their I/O
+	 * before tearing down the stream they may otherwise still update. */
+	if (capture->cancellable)
+		g_cancellable_cancel(capture->cancellable);
+
 	if (capture->session_handle) {
 		g_dbus_connection_call(portal_get_dbus_connection(), "org.freedesktop.portal.Desktop",
 				       capture->session_handle, "org.freedesktop.portal.Session", "Close", NULL, NULL,
@@ -570,9 +588,13 @@ static void screencast_portal_capture_destroy(void *data)
 
 	g_clear_pointer(&capture->restore_token, bfree);
 
-	g_clear_pointer(&capture->obs_pw_stream, obs_pipewire_stream_destroy);
-	obs_pipewire_destroy(capture->obs_pw);
-	g_cancellable_cancel(capture->cancellable);
+	if (capture->obs_pw) {
+		g_clear_pointer(&capture->obs_pw, obs_pipewire_destroy);
+		capture->obs_pw_stream = NULL;
+	} else {
+		g_clear_pointer(&capture->obs_pw_stream,
+				obs_pipewire_stream_destroy);
+	}
 	g_clear_object(&capture->cancellable);
 	bfree(capture);
 }

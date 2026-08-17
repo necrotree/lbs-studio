@@ -497,6 +497,17 @@ static void load_all_callback(void *param, const struct obs_module_info2 *info)
 	obs_module_t *disabled_module;
 
 	bool is_obs_plugin;
+	const char *filename = strrchr(info->bin_path, '/');
+	filename = filename ? filename + 1 : info->bin_path;
+
+	/* obs-browser keeps CEF's runtime libraries beside its module so the
+	 * dynamic linker can find them.  They are dependencies, not modules. */
+	if (astrcmpi(filename, "libcef.so") == 0 ||
+	    astrcmpi(filename, "libEGL.so") == 0 ||
+	    astrcmpi(filename, "libGLESv2.so") == 0 ||
+	    astrcmpi(filename, "libvulkan.so.1") == 0 ||
+	    astrcmpi(filename, "libvk_swiftshader.so") == 0)
+		return;
 
 	get_plugin_info(info->bin_path, &is_obs_plugin);
 
